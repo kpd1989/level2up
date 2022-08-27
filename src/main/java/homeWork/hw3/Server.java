@@ -41,9 +41,12 @@ public class Server {
                 listMessages.add(first);
 
                 for (Socket listSocet : listSocets) {
-                    Writer writer1 = new OutputStreamWriter(listSocet.getOutputStream());
-                    writer1.write(first + "\n");
-                    writer1.flush();
+                    /*if (listSocet==client){
+                        continue;
+                    }*/
+                    Writer writer = new OutputStreamWriter(listSocet.getOutputStream());
+                    writer.write(first + "\n");
+                    writer.flush();
                 }
             }
 
