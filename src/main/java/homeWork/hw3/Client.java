@@ -23,21 +23,19 @@ public class Client {
            } else System.out.println("Вы ввели пустое поле!!!!! нельзя так");
        }
 
-
         try (Socket socket = new Socket("localhost", 9000)) {
             Writer writer = new OutputStreamWriter(socket.getOutputStream(), StandardCharsets.UTF_8);
+            BufferedReader consoleReader = new BufferedReader(new InputStreamReader (System.in));
+            System.out.println("Вы вошли в чат. Приятного общения!");
 
             new Thread(()-> {
-                System.out.println("Вы вошли в чат. Приятного общения!");
                 handleInput(socket);
                 System.exit(0);
             }).start();
 
-            BufferedReader consoleReader = new BufferedReader(new InputStreamReader (System.in));
-
             for (;;) {
-                String timeMessage = new SimpleDateFormat("HH:mm:ss").format(Calendar.getInstance().getTime());
                 String line  = consoleReader.readLine();
+                String timeMessage = new SimpleDateFormat("HH:mm:ss").format(Calendar.getInstance().getTime());
                 writer.write(timeMessage + " - " + name +": "+line);
                 writer.write("\n");
                 writer.flush();

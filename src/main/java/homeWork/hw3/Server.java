@@ -22,12 +22,11 @@ public class Server {
                     writer.write(lastText+"\n");
                     writer.flush();
                 }
-
                 listSocets.add(client);
-                Thread thread = new Thread(() -> {
+
+                new Thread(() -> {
                     handleClient(client);
-                });
-                thread.start();
+                }).start();
             }
         }
     }
