@@ -4,29 +4,48 @@ import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
-
 public class Server {
-    private static List<String> listMessages = Collections.synchronizedList(new ArrayList<>());
-    private static List<Socket> listSocets = Collections.synchronizedList(new ArrayList<>());
+    private static List<String> listMessages = new ArrayList<>();
+    private static List<Socket> listSocets = new ArrayList<>();
 
-
-    public static void main(String[] args) throws IOException {
+    public static void main(String[] args) throws IOException, InterruptedException {
         try (ServerSocket server = new ServerSocket(9000)) {
             for(;;) {
                 Socket client = server.accept();
 
-                Writer writer = new OutputStreamWriter((client.getOutputStream()));
-                for(String lastText: listMessages){
-                    writer.write(lastText+"\n");
-                    writer.flush();
-                }
-                listSocets.add(client);
+                printMessageStore(client);
+
+                addClientToList(client);
 
                 new Thread(() -> {
                     handleClient(client);
+                    removeClientFromList(client);
                 }).start();
+            }
+        }
+    }
+
+    private static void removeClientFromList(Socket client) {
+        synchronized (listSocets) {
+            listSocets.remove(client);
+            System.out.println(listSocets);
+        }
+    }
+
+    private static void addClientToList(Socket client) {
+        synchronized (listSocets) {
+            listSocets.add(client);
+            System.out.println(listSocets);
+        }
+    }
+
+    private static void printMessageStore(Socket client) throws IOException {
+        Writer writer = new OutputStreamWriter((client.getOutputStream()));
+        for(String lastText: listMessages){
+            synchronized (lastText) {
+                writer.write(lastText + "\n");
+                writer.flush();
             }
         }
     }
@@ -36,16 +55,17 @@ public class Server {
             BufferedReader reader = new BufferedReader((new InputStreamReader(client.getInputStream())));
 
             for (;;) {
-                String first = reader.readLine();
-                listMessages.add(first);
+                String message = reader.readLine();
+                synchronized (listMessages) {
+                    listMessages.add(message);
+                }
 
                 for (Socket listSocet : listSocets) {
-                    /*if (listSocet==client){
-                        continue;
-                    }*/
-                    Writer writer = new OutputStreamWriter(listSocet.getOutputStream());
-                    writer.write(first + "\n");
-                    writer.flush();
+                    synchronized (listSocet) {
+                        Writer writer = new OutputStreamWriter(listSocet.getOutputStream());
+                        writer.write(message + "\n");
+                        writer.flush();
+                    }
                 }
             }
 
