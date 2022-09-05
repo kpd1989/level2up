@@ -3,68 +3,88 @@ package homeWork.hw3;
 import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.util.ArrayList;
-import java.util.List;
-public class Server {
-    private static List<String> listMessages = new ArrayList<>();
-    private static List<Socket> listSocets = new ArrayList<>();
+import java.util.*;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.BlockingQueue;
 
-    public static void main(String[] args) throws IOException, InterruptedException {
+public class Server {
+    private static List<String> historyMessages = Collections.synchronizedList(new ArrayList<>());
+    private static List<BlockingQueue<String>> queuesBlockingMessages = new ArrayList<>();
+
+    public static void main(String[] args) {
         try (ServerSocket server = new ServerSocket(9000)) {
-            for(;;) {
+            for (;;) {
                 Socket client = server.accept();
 
                 printMessageStore(client);
 
-                addClientToList(client);
+                new Thread(() -> {
+                    handleClientReader(client);
+                }).start();
 
                 new Thread(() -> {
-                    handleClient(client);
-                    removeClientFromList(client);
+                    handleClientWriter(client);
                 }).start();
             }
+        } catch (IOException e) {
+            throw new RuntimeException(e);
         }
     }
 
-    private static void removeClientFromList(Socket client) {
-        synchronized (listSocets) {
-            listSocets.remove(client);
-            System.out.println(listSocets);
+    private static void printMessageStore(Socket client){
+        Writer writer = null;
+        try {
+            writer = new OutputStreamWriter((client.getOutputStream()));
+        } catch (IOException e) {
+            throw new RuntimeException(e);
         }
-    }
 
-    private static void addClientToList(Socket client) {
-        synchronized (listSocets) {
-            listSocets.add(client);
-            System.out.println(listSocets);
+        ArrayList<String> copyHistoryToSendClient;
+        synchronized (historyMessages) {
+            copyHistoryToSendClient = new ArrayList<>(historyMessages);
         }
-    }
 
-    private static void printMessageStore(Socket client) throws IOException {
-        Writer writer = new OutputStreamWriter((client.getOutputStream()));
-        for(String lastText: listMessages){
-            synchronized (lastText) {
+        for (String lastText : copyHistoryToSendClient) {
+            try {
                 writer.write(lastText + "\n");
                 writer.flush();
+            } catch (IOException e) {
+                throw new RuntimeException(e);
             }
         }
     }
 
-    private static void handleClient(Socket client) {
+    private static void handleClientWriter(Socket client)  {
+        BlockingQueue<String> messageToSend = new ArrayBlockingQueue<>(100);
+        queuesBlockingMessages.add(messageToSend);
+
         try {
-            BufferedReader reader = new BufferedReader((new InputStreamReader(client.getInputStream())));
+            while (true) {
+                String message = messageToSend.take();
 
-            for (;;) {
+                Writer writer = new OutputStreamWriter(client.getOutputStream());
+                writer.write(message + "\n");
+                writer.flush();
+            }
+        } catch (IOException | InterruptedException e) {
+            throw new RuntimeException(e);
+        } finally {
+            queuesBlockingMessages.remove(messageToSend);
+        }
+    }
+
+    private static void handleClientReader(Socket client) {
+        try {
+            BufferedReader reader = new BufferedReader(
+                    (new InputStreamReader(client.getInputStream())));
+
+            while (true) {
                 String message = reader.readLine();
-                synchronized (listMessages) {
-                    listMessages.add(message);
-                }
+                historyMessages.add(message);
 
-                for (Socket listSocet : listSocets) {
-                    synchronized (listSocet) {
-                        Writer writer = new OutputStreamWriter(listSocet.getOutputStream());
-                        writer.write(message + "\n");
-                        writer.flush();
+                synchronized (queuesBlockingMessages) {
+                    for (BlockingQueue<String> otherClients : queuesBlockingMessages) {
+                        otherClients.add(message);
                     }
                 }
             }

@@ -10,7 +10,6 @@ import java.util.Scanner;
 public class Client {
     private static String name;
 
-
     public static void main(String[] args) throws IOException, InterruptedException {
         Scanner scanner = new Scanner(System.in);
 
